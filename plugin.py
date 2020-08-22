@@ -29,8 +29,11 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 		None
 
 	def __init__(self, session):
-		bitrate_choices = [( 50, "50 kbps" ), ( 100, "100 kbps" ), ( 200, "200 kbps" ), ( 500, "500 kbps" ), ( 1000, "1 Mbps" ), ( 2000, "2 Mbps" )]
-		size_choices = [ "480p", "576p", "720p" ]
+		vcodec_choices = [("h264", "H264")]
+		profiles_choices = [("baseline", "Baseline"), ("main", "Main"), ("high", "High")]
+		framerate_choices = [(24, "24 fps"), (25, "25 fps"), (30, "30 fps")]
+		bitrate_choices = [(50, "50 kbps"), (100, "100 kbps"), (200, "200 kbps"), (500, "500 kbps"), (1000, "1 Mbps"), (2000, "2 Mbps")]
+		size_choices = ["480p", "576p", "720p", "1080p"]
 
 		current_bitrate_value = ""
 		current_size = ""
@@ -40,11 +43,17 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 		config_list = []
 		Components.ConfigList.ConfigListScreen.__init__(self, config_list)
 
+		self.vcodec = Components.config.ConfigSelection(choices = vcodec_choices)
+		self.profile = Components.config.ConfigSelection(choices = profiles_choices)
+		self.framerate = Components.config.ConfigSelection(choices = framerate_choices)
 		self.bitrate = Components.config.ConfigSelection(choices = bitrate_choices)
 		self.size = Components.config.ConfigSelection(choices = size_choices)
 
-		config_list.append(Components.config.getConfigListEntry(_("Bitrate"), self.bitrate));
-		config_list.append(Components.config.getConfigListEntry(_("Video size"), self.size));
+		config_list.append(Components.config.getConfigListEntry(_("Video Codec"), self.vcodec));
+		config_list.append(Components.config.getConfigListEntry(_("Video Codec Profile"), self.profile));
+		config_list.append(Components.config.getConfigListEntry(_("Video Frame Rate"), self.framerate));
+		config_list.append(Components.config.getConfigListEntry(_("Video Bit Rate"), self.bitrate));
+		config_list.append(Components.config.getConfigListEntry(_("Video Size"), self.size));
 
 		self["config"].list = config_list
 
@@ -77,7 +86,7 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 			if boxtype == "et10000" or boxtype == "hd2400":
 				transcoding = "enigma"
 
-		if transcoding == "vuplus":
+		if transcoding == "vuplus" or boxtype == "hisilicon":
 			port = 8002
 		else:
 			if transcoding == "enigma2":
@@ -90,6 +99,8 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 		Components.config.config.plugins.transcodingsetup.framerate = Components.config.ConfigInteger(default = None)
 		Components.config.config.plugins.transcodingsetup.aspectratio = Components.config.ConfigInteger(default = None)
 		Components.config.config.plugins.transcodingsetup.interlaced = Components.config.ConfigInteger(default = None)
+		Components.config.config.plugins.transcodingsetup.vcodec = Components.config.ConfigText(default = "")
+		Components.config.config.plugins.transcodingsetup.profile = Components.config.ConfigText(default = "")
 
 		print "\n\n**** config port is", Components.config.config.plugins.transcodingsetup.port.value
 		print "**** config bitrate is", Components.config.config.plugins.transcodingsetup.bitrate.value
@@ -97,13 +108,21 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 		print "**** config framerate is", Components.config.config.plugins.transcodingsetup.framerate.value
 		print "**** config aspectratio is", Components.config.config.plugins.transcodingsetup.aspectratio.value
 		print "**** config interlaced is", Components.config.config.plugins.transcodingsetup.interlaced.value
+		print "**** config vcodec is", Components.config.config.plugins.transcodingsetup.vcodec.value
+		print "**** config profile is", Components.config.config.plugins.transcodingsetup.profile.value
 		print "**** vumodel is", vumodel
 		print "**** boxtype is", boxtype
 		print "**** transcoding is", transcoding
 		print "**** port is", port
 
+		if Components.config.config.plugins.transcodingsetup.vcodec.value == "":
+			Components.config.config.plugins.transcodingsetup.vcodec.value = "h264"
+
+		if Components.config.config.plugins.transcodingsetup.profile.value == "":
+			Components.config.config.plugins.transcodingsetup.profile.value = "baseline"
+
 		if Components.config.config.plugins.transcodingsetup.framerate.value is None:
-			Components.config.config.plugins.transcodingsetup.framerate.value = 30000
+			Components.config.config.plugins.transcodingsetup.framerate.value = 30
 
 		if Components.config.config.plugins.transcodingsetup.aspectratio.value is None:
 			Components.config.config.plugins.transcodingsetup.aspectratio.value = 2
@@ -127,10 +146,22 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 			if not line.startswith('#') and not line.startswith(';'):
 				tokens = line.split('=')
 
+				if(tokens[0] == "profile"):
+					for tuple in profiles_choices:
+						if tokens[1] == tuple[0]:
+							self.profile.setValue(tuple[0])
+							break
+
 				if(tokens[0] == "bitrate"):
 					for tuple in bitrate_choices:
 						if int(tokens[1]) <= int(tuple[0]):
 							self.bitrate.setValue(tuple[0])
+							break
+
+				if(tokens[0] == "framerate"):
+					for tuple in framerate_choices:
+						if int(tokens[1]) <= int(tuple[0]):
+							self.framerate.setValue(tuple[0])
 							break
 
 				if(tokens[0] == "size"):
@@ -160,8 +191,14 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 
 	def keyGo(self):
 		for token in self.content:
+			if(token[0] == "profile"):
+				token[1] = self.profile.value
+
 			if(token[0] == "bitrate"):
 				token[1] = self.bitrate.value
+
+			if(token[0] == "framerate"):
+				token[1] = self.framerate.value
 
 			if(token[0] == "size"):
 				token[1] = self.size.value
@@ -176,14 +213,15 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 		if self.size.value == "480p":
 			resx = 720
 			resy = 480
-		else:
-			if self.size.value == "576p":
-				resx = 720
-				resy = 576
-			else:
-				if self.size.value == "720p":
-					resx = 1280
-					resy = 720
+		elif self.size.value == "576p":
+			resx = 720
+			resy = 576
+		elif self.size.value == "720p":
+			resx = 1280
+			resy = 720
+		elif self.size.value == "1080p":
+			resx = 1920
+			resy = 1080
 
 		print "**** size:", self.size.value, resx, resy
 
@@ -199,6 +237,8 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 		Components.config.config.plugins.transcodingsetup.framerate.save()
 		Components.config.config.plugins.transcodingsetup.aspectratio.save()
 		Components.config.config.plugins.transcodingsetup.interlaced.save()
+		Components.config.config.plugins.transcodingsetup.vcodec.save()
+		Components.config.config.plugins.transcodingsetup.profile.save()
 		Components.config.configfile.save()
 
 		self.close()
