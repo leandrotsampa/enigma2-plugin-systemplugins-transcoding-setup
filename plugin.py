@@ -1,5 +1,6 @@
 from Plugins.Plugin import PluginDescriptor
 
+import os
 import Screens.Screen
 import Components.ConfigList
 import Components.Sources.StaticText
@@ -135,11 +136,14 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 
 		rawcontent = []
 
-		with open("/etc/enigma2/streamproxy.conf", "r") as f:
-			rawcontent = f.readlines()
-			rawcontent = [x.translate(None, ' \n\r') for x in rawcontent]
-			f.close()
+		if os.path.exists("/etc/enigma2/streamproxy.conf"):
+			with open("/etc/enigma2/streamproxy.conf", "r") as f:
+				rawcontent = f.readlines()
+				f.close()
+		else:
+			rawcontent = eval("['# specify all tcp ports to listen on and their default action (transcode or stream)\\n', 'listen = 8002:transcode\\n', '# defaults for transcoding, these can be overridden from the URL or with cookies\\n', 'size = 480p\\n', 'bitrate = 500\\n', 'framerate = 25\\n', '# note: profile, level and bframes are often not actually honoured or are malfunctioning,\\n', '# best leave them to these defaults.\\n', 'profile = high\\n', 'level = 3.1\\n', 'bframes = 0\\n', '# audio language track selection for file transcoding, use:\\n', '# \\txxx: first\\n', '# \\tde or deu: german\\n', '# \\ten or eng: english\\n', '# \\tfr or fra: french\\n', '# \\tnl or nld: dutch\\n', 'audiolang = xxx\\n']")
 
+		rawcontent = [x.translate(None, ' \n\r') for x in rawcontent]
 		self.content = []
 
 		for line in rawcontent:
@@ -203,7 +207,7 @@ class TranscodingSetup(Components.ConfigList.ConfigListScreen, Screens.Screen.Sc
 			if(token[0] == "size"):
 				token[1] = self.size.value
 
-		with open("/etc/enigma2/streamproxy.conf", "w") as f:
+		with open("/etc/enigma2/streamproxy.conf", "w+") as f:
 			for token in self.content:
 				f.write("%s = %s\n" % (token[0], token[1]))
 			f.close()
